@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tic Tac Toe — Unbeatable AI (Minimax + Alpha‑Beta)</title>
+  <style>
+    /* =====================
+       THEME SYSTEM (magical!)
+       ===================== */
+    :root{
+      --bg:#0b1024; --card:#111827; --line:#334155; --text:#E6EDF3; --muted:#9AA7B2; --x:#ff4b5c; --o:#74a7ff; --accent:#7c3aed;
+      --glow: 0 10px 30px rgba(124,58,237,.25);
+    }
+    body[data-theme="aurora"]{
+      --bg: #050816; --card:#0b1224; --line:#1f2a44; --text:#e6f1ff; --muted:#9fb4d3; --x:#ff7a88; --o:#7cc0ff; --accent:#16f2b3;
+      background: radial-gradient(1000px 600px at 10% 10%, #0b1224 0%, #050816 60%, #030712 100%), #050816;
+    }
+    body[data-theme="neon"]{
+      --bg:#0a0a0a; --card:#121212; --line:#262626; --text:#f5f5f5; --muted:#aaaaaa; --x:#ff3b3b; --o:#21d0ff; --accent:#00ff85;
+      background: radial-gradient(600px 400px at 80% 20%, rgba(0,255,133,.15), transparent 60%), #0a0a0a;
+    }
+    body[data-theme="sunset"]{
+      --bg:#1f0a2a; --card:#2a102f; --line:#4a235a; --text:#ffe9f7; --muted:#e5b1d6; --x:#ff9f67; --o:#ff5b94; --accent:#ffd166;
+      background: linear-gradient(135deg, #4a235a, #1f0a2a 60%);
+    }
+    body[data-theme="cyber"]{
+      --bg:#001018; --card:#021f2a; --line:#053445; --text:#dff8ff; --muted:#9ad5e4; --x:#ff5f5f; --o:#48e0e4; --accent:#00ffc3;
+      background: linear-gradient(120deg, #001018, #05161c);
+    }
+    body[data-theme="pastel"]{
+      --bg:#f3f0ff; --card:#ffffff; --line:#e5e7eb; --text:#111827; --muted:#6b7280; --x:#f472b6; --o:#60a5fa; --accent:#a78bfa;
+      background: linear-gradient(180deg, #f3f0ff, #fef9f5);
+    }
+
+    /* Base layout */
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100vh; color:var(--text);
+      display:flex; align-items:center; justify-content:center; padding:24px;
+    }
+    .app{width:min(1040px, 96vw)}
+
+    .header{display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:14px}
+    .title{font-weight:900; font-size:clamp(20px,2.6vw,28px); letter-spacing:.2px}
+
+    .controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    .seg{display:flex; gap:6px; align-items:center}
+    .label{font-size:12px; color:var(--muted); padding:4px 8px; border-radius:999px; border:1px solid var(--line)}
+    select, button{ background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:12px; padding:10px 12px; font-weight:600; cursor:pointer; transition:.18s ease}
+    select:hover, button:hover{ border-color:#6b7280 }
+    button.primary{ background:linear-gradient(135deg, var(--accent), transparent); border-color:transparent; box-shadow:var(--glow) }
+
+    .board{ margin:18px auto 10px; display:grid; grid-template-columns:repeat(3, 120px); grid-template-rows:repeat(3, 120px); gap:12px; width:fit-content }
+    @media (max-width:520px){ .board{ grid-template-columns:repeat(3, 96px); grid-template-rows:repeat(3, 96px); gap:10px } }
+
+    .cell{ 
+      background:var(--card); border:1px solid var(--line); border-radius:18px; display:flex; align-items:center; justify-content:center; 
+      font-weight:900; font-size:54px; user-select:none; cursor:pointer;
+      box-shadow: inset 0 10px 30px rgba(0,0,0,.25);
+      transition: transform .08s ease, border-color .2s ease, box-shadow .2s ease, background .2s ease;
+    }
+    .cell:hover{ transform:translateY(-1px); border-color:#8b9ab6 }
+    .cell.taken{ cursor:not-allowed; opacity:.95 }
+    .x{ color:var(--x); text-shadow:0 0 18px rgba(255, 90, 90, .45)}
+    .o{ color:var(--o); text-shadow:0 0 18px rgba(100, 170, 255, .45)}
+    .win{ background:linear-gradient(145deg, rgba(0,255,200,.15), rgba(0,0,0,.08)); border-color:var(--accent) }
+
+    .status{ text-align:center; margin:8px 0 2px; font-weight:700; color:var(--muted)}
+
+    .footer{ display:flex; justify-content:center; gap:10px; margin-top:8px }
+
+    /* subtle confetti canvas */
+    #fx{ position:fixed; inset:0; pointer-events:none }
+  </style>
+</head>
+<body data-theme="aurora">
+  <canvas id="fx"></canvas>
+  <div class="app">
+    <div class="header">
+      <div class="title">Tic Tac Toe — <span style="opacity:.9">Unbeatable AI</span></div>
+      <div class="controls">
+        <div class="seg"><span class="label">Theme</span>
+          <select id="theme">
+            <option value="aurora">Aurora</option>
+            <option value="neon">Neon</option>
+            <option value="sunset">Sunset</option>
+            <option value="cyber">Cyber</option>
+            <option value="pastel">Pastel</option>
+          </select>
+        </div>
+        <div class="seg"><span class="label">Who starts?</span>
+          <select id="starter">
+            <option value="human">Human (X)</option>
+            <option value="ai">AI (O)</option>
+          </select>
+        </div>
+        <button id="reset" class="primary">Restart</button>
+      </div>
+    </div>
+
+    <div id="status" class="status">Your turn — you are X</div>
+    <div id="board" class="board" role="grid" aria-label="Tic Tac Toe board"></div>
+  </div>
+
+  <script>
+    // ========= Core State =========
+    const HUMAN='X', AI='O';
+    const boardEl = document.getElementById('board');
+    const statusEl = document.getElementById('status');
+    const themeSel = document.getElementById('theme');
+    const starterSel = document.getElementById('starter');
+    const resetBtn = document.getElementById('reset');
+
+    let board = Array(9).fill('');
+    let gameOver = false;
+
+    const WIN = [ [0,1,2],[3,4,5],[6,7,8], [0,3,6],[1,4,7],[2,5,8], [0,4,8],[2,4,6] ];
+
+    // ========= Rendering =========
+    function render(){
+      boardEl.innerHTML = '';
+      board.forEach((v,i)=>{
+        const b=document.createElement('button');
+        b.className='cell'+(v? ' taken':'');
+        b.setAttribute('role','gridcell');
+        b.setAttribute('aria-label',`Cell ${i+1}${v? ' '+v:''}`);
+        b.textContent=v; if(v==='X') b.classList.add('x'); if(v==='O') b.classList.add('o');
+        b.addEventListener('click',()=>onClick(i));
+        boardEl.appendChild(b);
+      });
+      const res = getWinner(board);
+      if(res){
+        const nodes = boardEl.querySelectorAll('.cell');
+        res.line.forEach(idx=>nodes[idx].classList.add('win'));
+      }
+    }
+
+    function setStatus(msg){ statusEl.textContent = msg; }
+
+    // ========= Rules =========
+    function getWinner(b){
+      for(const line of WIN){ const [a,c,d]=line; if(b[a] && b[a]===b[c] && b[a]===b[d]) return {player:b[a], line}; }
+      return null;
+    }
+    const full = b => b.every(x=>x!== '');
+
+    // ========= Minimax + Alpha-Beta =========
+    function minimax(b, isMax, alpha, beta, depth){
+      const r=getWinner(b);
+      if(r){ if(r.player===AI) return 10-depth; if(r.player===HUMAN) return depth-10; }
+      if(full(b)) return 0;
+
+      if(isMax){ // AI
+        let best=-Infinity;
+        for(let i=0;i<9;i++) if(b[i]===''){
+          b[i]=AI; const sc=minimax(b,false,alpha,beta,depth+1); b[i]='';
+          if(sc>best) best=sc; if(sc>alpha) alpha=sc; if(beta<=alpha) break;
+        }
+        return best;
+      }else{ // Human
+        let best=Infinity;
+        for(let i=0;i<9;i++) if(b[i]===''){
+          b[i]=HUMAN; const sc=minimax(b,true,alpha,beta,depth+1); b[i]='';
+          if(sc<best) best=sc; if(sc<beta) beta=sc; if(beta<=alpha) break;
+        }
+        return best;
+      }
+    }
+
+    function bestMove(b){
+      // small heuristic: prefer center when available
+      if(b[4]==='') return 4;
+      let best=-Infinity, move=-1;
+      for(let i=0;i<9;i++) if(b[i]===''){
+        b[i]=AI; const sc=minimax(b,false,-Infinity,Infinity,0); b[i]='';
+        if(sc>best){ best=sc; move=i; }
+      }
+      return move;
+    }
+
+    // ========= Interaction =========
+    function onClick(i){
+      if(gameOver || board[i]!== '') return;
+      board[i]=HUMAN; render();
+      const h=getWinner(board); if(h){ end('You win! ✨'); return; }
+      if(full(board)){ end("It's a draw! 🤝"); return; }
+      setStatus('AI thinking…');
+      setTimeout(()=>{
+        const m=bestMove(board); if(m!==-1) board[m]=AI; render();
+        const a=getWinner(board); if(a){ end('AI wins! 🤖'); return; }
+        if(full(board)){ end("It's a draw! 🤝"); return; }
+        setStatus('Your turn — you are X');
+      }, 120);
+    }
+
+    function end(msg){ gameOver=true; setStatus(msg); confettiBurst(); }
+
+    function reset(){
+      board=Array(9).fill(''); gameOver=false; render();
+      const starter = starterSel.value;
+      if(starter==='human'){ setStatus('Your turn — you are X'); }
+      else{
+        setStatus('AI starts — thinking…');
+        setTimeout(()=>{ const m=bestMove(board); if(m!==-1) board[m]=AI; render(); setStatus('Your turn — you are X'); }, 160);
+      }
+    }
+
+    // ========= Theme switching =========
+    themeSel.addEventListener('change', ()=>{
+      document.body.setAttribute('data-theme', themeSel.value);
+    });
+
+    starterSel.addEventListener('change', reset);
+    resetBtn.addEventListener('click', reset);
+
+    // ========= Tiny Confetti (no libs) =========
+    const fx=document.getElementById('fx'); const ctx=fx.getContext('2d');
+    function size(){ fx.width=innerWidth; fx.height=innerHeight; }
+    addEventListener('resize', size); size();
+    let parts=[]; function confettiBurst(){
+      const n=80; const cx=innerWidth/2, cy=innerHeight/2.4;
+      for(let i=0;i<n;i++) parts.push({x:cx,y:cy, vx:(Math.random()-0.5)*6, vy:Math.random()*-6-2, a:Math.random()*Math.PI, s:2+Math.random()*3, life:80+Math.random()*40});
+      if(!animating) animate();
+    }
+    let animating=false; function animate(){ animating=true; ctx.clearRect(0,0,fx.width,fx.height);
+      parts.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.a+=0.2; p.life-=1; });
+      parts=parts.filter(p=>p.life>0);
+      parts.forEach(p=>{ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.a); ctx.fillStyle = `hsl(${(p.life*7)%360} 100% 60%)`; ctx.fillRect(-p.s,-p.s,p.s*2,p.s*2); ctx.restore(); });
+      if(parts.length){ requestAnimationFrame(animate); } else { animating=false; }
+    }
+
+    // ========= Boot =========
+    render(); setStatus('Your turn — you are X');
+  </script>
+</body>
+</html>
